@@ -17,14 +17,32 @@ filebeat.prospectors:
   document_type: apache_error
   fields_under_root: true
 
-#- paths:
-#    - /logs/docker.log
-#  tags:
-#    - testenv
-#    - docker
-#  input_type: log
-#  document_type: docker
-#  fields_under_root: true
+- paths:
+    - /var/log/messages*
+  tags:
+    - testenv
+    - messages
+  input_type: log
+  document_type: systemglob 
+  fields_under_root: true
+
+- paths:
+    - /var/log/secure*
+  tags:
+    - testenv
+    - secure
+  input_type: log
+  document_type: secure
+  fields_under_root: true
+
+- paths:
+    - /var/log/maillog*
+  tags:
+    - testenv
+    - secure
+  input_type: log
+  document_type: mail
+  fields_under_root: true
 
 output.kafka:
   hosts: ["kafka:9092"]
