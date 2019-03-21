@@ -1,0 +1,5 @@
+
+
+output.elasticsearch:
+  hosts: ["https://elasticsearch:9200"]
+  index: "filebeat-%{+yyyy.MM.dd}"

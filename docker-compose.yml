@@ -1,0 +1,56 @@
+version: '2'
+services:
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    links:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    hostname: kafka
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT:  zookeeper:2181
+      KAFKA_CREATE_TOPICS: "slog:1:1"
+    networks:
+      - exam
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - exam
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:6.6.2
+    container_name: filebeat1
+    mem_limit: 1g
+    volumes:
+      - "./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
+      - "./apache-logs:/apache-logs"
+      - "/var/log:/logs:ro"
+    links:
+      - kafka
+    depends_on:
+      - apache
+      - kafka
+    networks:
+      - exam
+
+  apache:
+    image: lzrbear/docker-apache2-ubuntu
+    container_name: apache
+    volumes:
+      - "./apache-logs:/var/log/apache2"
+    ports:
+      - "8888:80"
+    networks:
+      - exam
+
+networks:
+  exam:
+    external: true
