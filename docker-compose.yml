@@ -1,56 +1,177 @@
 version: '2'
 services:
-  kafka:
+
+  kafka1:
     image: wurstmeister/kafka
-    container_name: kafka
+    container_name: kafka1
+    hostname: kafka1
     depends_on:
       - zookeeper
     links:
       - zookeeper
     ports:
       - "9092:9092"
-    hostname: kafka
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_BROKER_ID: 1
       KAFKA_ADVERTISED_PORT: 9092
       KAFKA_ZOOKEEPER_CONNECT:  zookeeper:2181
       KAFKA_CREATE_TOPICS: "slog:1:1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - exam
+      nexam:
+        ipv4_address: 172.20.128.2
+
+  kafka2:
+    image: wurstmeister/kafka
+    container_name: kafka2
+    hostname: kafka2
+    depends_on:
+      - zookeeper
+    links:
+      - zookeeper
+    ports:
+      - "9093:9092"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT:  zookeeper:2181
+      KAFKA_CREATE_TOPICS: "slog:1:1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      nexam:
+        ipv4_address: 172.20.128.3
+
   zookeeper:
     image: wurstmeister/zookeeper
     container_name: zookeeper
     ports:
       - "2181:2181"
     networks:
-      - exam
+      nexam:
+        ipv4_address: 172.20.128.4
+
+  kafkamanager:
+    image: sheepkiller/kafka-manager:latest
+    container_name: kafkamanager
+    networks:
+      nexam:
+        ipv4_address: 172.20.128.6
+    ports:
+      - "9000:9000"
+    links:
+      - kafka1
+      - kafka2
+      - zookeeper
+    environment:
+      ZK_HOSTS: zookeeper:2181
+      APPLICATION_SECRET: letmein
+      KM_ARGS: -Djava.net.preferIPv4Stack=true
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:6.6.2
-    container_name: filebeat1
+    container_name: filebeat
+    user: root
     mem_limit: 1g
     volumes:
-      - "./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
-      - "./apache-logs:/apache-logs"
-      - "/var/log:/logs:ro"
+      - "./resources/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
+      - "/var/log:/var/log:ro"
+      - "./resources/datalog:/tmp/datalog:ro"
+    command: >
+      /bin/bash -c "
+        sleep 45;
+        filebeat -e;
+      "
     links:
-      - kafka
+      - kafka1
+      - kafka2
+      - kafkamanager
     depends_on:
-      - apache
-      - kafka
+      - kafka1
+      - kafka2
+      - kafkamanager
     networks:
-      - exam
+      nexam:
+        ipv4_address: 172.20.128.14
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:6.6.2
+    container_name: logstash
+    volumes:
+      - "./resources/logstash.conf:/config-dir/logstash.conf"
+      - "./resources/logstashout:/usr/share/logstash/tmp/logstashout:ro"
+    restart: always
+    command: logstash -f /config-dir/logstash.conf
+    ports:
+      - "9600:9600"
+    links:
+      - kafka1
+      - kafka2
+      - kafkamanager
+      - filebeat
+      - elasticsearch
+    networks:
+      nexam:
+        ipv4_address: 172.20.128.15
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.6.2
+    container_name: kibana
+    volumes:
+      - "./resources/kibana.yml:/usr/share/kibana/config/kibana.yml"
+    restart: always
+    ports:
+      - "5601:5601"
+    links:
+      - elasticsearch
+    depends_on:
+      - elasticsearch
+    networks:
+      nexam:
+        ipv4_address: 172.20.128.16
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.6.2
+    container_name: elasticsearch
+    user: root
+    environment:
+      - cluster.name=docker-cluster
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    mem_limit: 2g
+    volumes:
+      - "./esdata:/usr/share/elasticsearch/data"
+    ports:
+      - "9200:9200"
+    networks:
+      nexam:
+        ipv4_address: 172.20.128.17
 
   apache:
     image: lzrbear/docker-apache2-ubuntu
     container_name: apache
     volumes:
-      - "./apache-logs:/var/log/apache2"
+      - "./resources/apache-logs:/var/log/apache2"
     ports:
       - "8888:80"
     networks:
-      - exam
+      nexam:
+        ipv4_address: 172.20.128.18
 
 networks:
-  exam:
-    external: true
+  nexam:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          ip_range: 172.28.5.0/24

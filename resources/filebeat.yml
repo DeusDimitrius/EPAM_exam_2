@@ -1,0 +1,53 @@
+filebeat.prospectors:
+
+- input_type: log
+  enabled: true
+  paths:
+    - /var/log/messages*
+  tags:
+    - testenv
+    - messages
+  fields: {log_type: systemglob}
+  fields_under_root: true
+
+- input_type: log
+  enabled: true
+  paths:
+    - /var/log/secure*
+  tags:
+    - testenv
+    - secure
+  fields: {log_type: secure}
+  fields_under_root: true
+
+- input_type: log
+  enabled: true
+  paths:
+    - /var/log/maillog*
+  tags:
+    - testenv
+    - mail
+  fields: {log_type: mail}
+  fields_under_root: true
+
+output.logstash:
+  enabled: false
+  hosts: ["logstash:5044"]
+  ssl.verification_mode: none
+
+output.kafka:
+  # Boolean flag to enable or disable the output module.
+  enabled: true
+  hosts: ["kafka1:9092", "kafka2:9092"]
+  topic: 'slog'
+  #partition.round_robin:
+  #  reachable_only: false
+  #required_acks: 1
+  compression: gzip
+  max_message_bytes: 100000000
+
+output.file:
+  # Boolean flag to enable or disable the output module.
+  enabled: false
+  path: "/tmp/datalog"
+

@@ -62,3 +62,7 @@ services:
 networks:
   exam:
     external: true
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          ip_range: 172.28.5.0/24
