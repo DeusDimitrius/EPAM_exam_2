@@ -1,33 +1,36 @@
-filebeat.prospectors:
+filebeat.inputs:
 
-- input_type: log
+- type: log
   enabled: true
   paths:
     - /var/log/messages*
   tags:
     - testenv
     - messages
-  fields: {log_type: systemglob}
+  fields:
+    service: "systemglob"
   fields_under_root: true
 
-- input_type: log
+- type: log
   enabled: true
   paths:
     - /var/log/secure*
   tags:
     - testenv
     - secure
-  fields: {log_type: secure}
+  fields:
+    service: "secure"
   fields_under_root: true
 
-- input_type: log
+- type: log
   enabled: true
   paths:
     - /var/log/maillog*
   tags:
     - testenv
     - mail
-  fields: {log_type: mail}
+  fields:
+    service: "mail"
   fields_under_root: true
 
 output.logstash:
@@ -40,9 +43,9 @@ output.kafka:
   enabled: true
   hosts: ["kafka1:9092", "kafka2:9092"]
   topic: 'slog'
-  #partition.round_robin:
-  #  reachable_only: false
-  #required_acks: 1
+  partition.round_robin:
+    reachable_only: false
+  required_acks: 1
   compression: gzip
   max_message_bytes: 100000000
 
@@ -51,3 +54,29 @@ output.file:
   enabled: false
   path: "/tmp/datalog"
 
+############################# Logging #########################################
+#
+## There are three options for the log ouput: syslog, file, stderr.
+## Under Windos systems, the log files are per default sent to the file output,
+## under all other system per default to syslog.
+logging:
+  to_syslog: true
+  to_files: true
+  files:
+    # The directory where the log files will written to.
+    path: /var/log/
+
+    # The name of the files where the logs are written to.
+    name: filebeats.log
+
+    # Configure log file size limit. If limit is reached, log file will be
+    # automatically rotated
+    rotateeverybytes: 10485760 # = 10MB
+
+    # Number of rotated log files to keep. Oldest files will be deleted first.
+    keepfiles: 7
+
+  # Sets log level. The default log level is error.
+  # Available log levels are: critical, error, warning, info, debug
+  level: info
+                                   
